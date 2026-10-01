@@ -29,6 +29,10 @@ export default function Login() {
   const [restorePreviewBusy, setRestorePreviewBusy] = useState(false);
   const [restoreExecuteBusy, setRestoreExecuteBusy] = useState(false);
   const [restoreMsg, setRestoreMsg] = useState(null);
+  const [pwUser, setPwUser] = useState('');
+  const [pwPass, setPwPass] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwError, setPwError] = useState('');
 
   const isFirstUser = setupComplete === false;
 
@@ -83,6 +87,30 @@ export default function Login() {
     setRestoreMsg(null);
   };
 
+  // Username + password sign-in (our fork): POST /api/auth/login sets the session
+  // cookies, then a reload lets AuthContext pick the session up from the refresh cookie.
+  const passwordLogin = async (e) => {
+    e.preventDefault();
+    setPwBusy(true);
+    setPwError('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: pwUser.trim(), password: pwPass }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || 'Sign in failed');
+      }
+      window.location.assign('/');
+    } catch (err) {
+      setPwError(err.message || 'Sign in failed');
+      setPwBusy(false);
+    }
+  };
+
   const heading = isFirstUser
     ? 'Create your admin account'
     : 'Sign in to your account';
@@ -134,6 +162,38 @@ export default function Login() {
             {microsoftLabel}
           </a>
         </div>
+
+        {!isFirstUser && (
+          <form onSubmit={passwordLogin} className="space-y-3">
+            <p className="text-center text-xs text-gray-500">or sign in with username and password</p>
+            <input
+              type="text"
+              autoComplete="username"
+              placeholder="Username"
+              value={pwUser}
+              onChange={(e) => setPwUser(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              required
+            />
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Password"
+              value={pwPass}
+              onChange={(e) => setPwPass(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              required
+            />
+            {pwError && <p className="text-sm text-red-600">{pwError}</p>}
+            <button
+              type="submit"
+              disabled={pwBusy}
+              className="w-full py-2.5 px-4 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            >
+              {pwBusy ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        )}
 
         {isFirstUser && (
           <>
