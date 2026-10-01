@@ -1,0 +1,46 @@
+# Dokploy deployment (ours). Differs from docker-compose.no-caddy.yml on purpose:
+#  - builds the app from this repo instead of pulling the unpinned azowail/quickly image
+#  - publishes no host port; Dokploy's Traefik routes the domain to app:8000
+#  - database password and signing key come from the Dokploy env, not "postgres"/ephemeral
+name: quickly
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quickly
+      POSTGRES_PASSWORD: ${QUICKLY_DB_PASSWORD}
+      POSTGRES_DB: quickly
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quickly -d quickly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://quickly:${QUICKLY_DB_PASSWORD}@db:5432/quickly"
+      QUICKLY_SECRET_KEY: ${QUICKLY_SECRET_KEY}
+      BASE_URL: ${BASE_URL}
+      CORS_ORIGINS: ${BASE_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      QUICKLY_LOCAL_DISK_BACKUPS: "1"
+      QUICKLY_PREBUILT_IMAGE: "1"
+      QUICKLY_MODE: production
+    volumes:
+      - backups:/app/backups
+
+volumes:
+  pgdata:
+  backups:
